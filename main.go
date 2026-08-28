@@ -2,9 +2,10 @@ package main
 
 import(
 	"net/http"
-	"time"
 	"fmt"
 	"sync/atomic"
+	"encoding/json"
+	"log"
 )
 
 type apiConfig struct {
@@ -22,12 +23,14 @@ func main() {
 			http.StripPrefix("/app", http.FileServer(http.Dir("./testFiles/"))),
 		),
 	)
+
 	mux.HandleFunc("GET /api/healthz", func( w http.ResponseWriter, r *http.Request){
 		w.Header().Add("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		
 		w.Write([]byte("OK"))
 	})
+	mux.HandleFunc("POST /api/validate_chirp", handlerValidateChirp)
 
 	mux.HandleFunc("GET /admin/metrics", cfg.handlerMetrics)
 	mux.HandleFunc("POST /admin/reset", cfg.handlerMetricsReset)
@@ -35,12 +38,38 @@ func main() {
 	serv := &http.Server{
 		Addr: ":8080",
 		Handler: mux,
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   10 * time.Second,
-		MaxHeaderBytes: 1 << 20,
 	}
 
 	serv.ListenAndServe()
+}
+
+func handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
+	type parameters struct {
+		Body string `json:"body"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	params := parameters{}
+	err := decoder.Decode(&params)
+	if err != nil {
+		log.Printf("Error decoding parameters: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	if len(params.Body) > 140 {
+		respondWithError(w, 400, "Chirp is too long")
+		return
+	}
+
+	type returnVals struct {
+		Valid bool `json:"valid"`
+	}
+	ret := returnVals{
+		Valid: true,
+	}
+
+	respondWithJSON(w, 200, ret)
 }
 
 func (cfg *apiConfig) handlerMetrics(w http.ResponseWriter, r *http.Request) {
