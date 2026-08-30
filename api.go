@@ -6,6 +6,10 @@ import(
 	"log"
 	"strings"
 	"slices"
+
+	"github.com/google/uuid"
+
+	"github.com/F0hor/Chirpy/internal/database"
 )
 
 var profaneWords = []string{
@@ -14,12 +18,10 @@ var profaneWords = []string{
 	"fornax",
 }
 
-func handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Body string `json:"body"`
-	}
-	type returnVals struct {
-		Body string `json:"cleaned_body"`
+		UserID string `json:"user_id"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -36,11 +38,28 @@ func handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ret := returnVals{
-		Body: censoreProfane(params.Body),
+	cenStr := censoreProfane(params.Body)
+	uid, err := uuid.Parse(params.UserID)
+	if err != nil {
+		log.Printf("Error while creating chirp: %s", err)
+		respondWithError(w, 400, "Invalid user id")
+		return
 	}
 
-	respondWithJSON(w, 200, ret)
+	chirp, err := cfg.db.CreateChirp(
+		r.Context(),
+		database.CreateChirpParams{
+			Body: cenStr,
+			UserID: uid,
+		},
+	)
+	if err != nil {
+		log.Printf("Error creating chirp in DB: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	respondWithJSON(w, 201, mapDbChirp(chirp))
 }
 
 func censoreProfane(txt string) string {
