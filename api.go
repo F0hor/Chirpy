@@ -98,3 +98,18 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) 
 	respondWithJSON(w, 201, mapDbUser(user))
 }
 
+func (cfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request) {
+	chirps, err := cfg.db.GetChirps(r.Context())
+	if err != nil {
+		log.Printf("Error geting chirps in DB: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	ret := []Chirp{}
+	for _, c := range chirps {
+		ret = append(ret, mapDbChirp(c))
+	}
+
+	respondWithJSON(w, 200, ret)
+}
