@@ -3,6 +3,7 @@ package main
 import(
 	"net/http"
 	"fmt"
+	"log"
 )
 
 func (cfg *apiConfig) handlerMetrics(w http.ResponseWriter, r *http.Request) {
@@ -18,6 +19,18 @@ func (cfg *apiConfig) handlerMetrics(w http.ResponseWriter, r *http.Request) {
 }
 
 func (cfg *apiConfig) handlerMetricsReset(w http.ResponseWriter, r *http.Request) {
+	if !cfg.isDev {
+		w.WriteHeader(403)
+		return
+	}
+
+	err := cfg.db.ResetUsers(r.Context())
+	if err != nil {
+		log.Printf("Error decoding parameters: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+
 	cfg.fileserverHits.Store(0)
 
 	w.Header().Add("Content-Type", "text/plain; charset=utf-8")

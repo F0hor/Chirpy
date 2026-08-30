@@ -6,9 +6,10 @@ import(
 	"net/http"
 	"fmt"
 	"sync/atomic"
-	"github.com/joho/godotenv"
 	"os"
 	"database/sql"
+	
+	"github.com/joho/godotenv"
 
 	"github.com/F0hor/Chirpy/internal/database"
 )
@@ -16,6 +17,7 @@ import(
 type apiConfig struct {
 	fileserverHits atomic.Int32
 	db *database.Queries
+	isDev bool
 }
 
 func main() {
@@ -31,8 +33,16 @@ func main() {
 	}
 	dbQueries := database.New(db)
 
+	var isDev bool
+	if os.Getenv("PLATFORM") == "dev" {
+		isDev = true
+	} else {
+		isDev = false
+	}
+
 	cfg := apiConfig{
 		db: dbQueries,
+		isDev: isDev,
 	}
 
 	mux := http.NewServeMux()
@@ -50,6 +60,7 @@ func main() {
 		w.Write([]byte("OK"))
 	})
 	mux.HandleFunc("POST /api/validate_chirp", handlerValidateChirp)
+	mux.HandleFunc("POST /api/users", cfg.handlerCreateUser)
 
 	mux.HandleFunc("GET /admin/metrics", cfg.handlerMetrics)
 	mux.HandleFunc("POST /admin/reset", cfg.handlerMetricsReset)
