@@ -10,6 +10,7 @@ import(
 	"github.com/google/uuid"
 
 	"github.com/F0hor/Chirpy/internal/database"
+	"github.com/F0hor/Chirpy/internal/auth"
 )
 
 var profaneWords = []string{
@@ -77,6 +78,7 @@ func censoreProfane(txt string) string {
 func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Email string `json:"email"`
+		Pass string `json:"password"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -88,7 +90,20 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	user, err := cfg.db.CreateUser(r.Context(), params.Email)
+	hash, err := auth.HashPassword(params.Pass)
+	if err != nil {
+		log.Printf("Error hashing password: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	user, err := cfg.db.CreateUser(
+		r.Context(), 
+		database.CreateUserParams{
+			Email: params.Email,
+			HashedPassword: hash,
+		},
+	)
 	if err != nil {
 		log.Printf("Error creating user in DB: %s", err)
 		w.WriteHeader(500)
@@ -96,6 +111,37 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) 
 	}
 
 	respondWithJSON(w, 201, mapDbUser(user))
+}
+
+func (cfg *apiConfig) handlerLoginUser(w http.ResponseWriter, r *http.Request) {
+	type parameters struct {
+		Email string `json:"email"`
+		Pass string `json:"password"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	params := parameters{}
+	err := decoder.Decode(&params)
+	if err != nil {
+		log.Printf("Error decoding parameters: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	user, err := cfg.db.GetUserByMail(r.Context(), params.Email)
+	if err != nil {
+		log.Printf("Error getting user in DB: %s", err)
+		respondWithError(w, 401, "Incorrect email or password")
+		return
+	}
+
+	match, err := auth.CheckPasswordHash(params.Pass, user.HashedPassword)
+	if err != nil || !match {
+		respondWithError(w, 401, "Incorrect email or password")
+		return
+	}
+
+	respondWithJSON(w, 200, mapDbUser(user))
 }
 
 func (cfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request) {
