@@ -113,3 +113,26 @@ func (cfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request) {
 
 	respondWithJSON(w, 200, ret)
 }
+
+func (cfg *apiConfig) handlerGetChirp(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("chirpID"))
+	if err != nil {
+		respondWithError(w, 400, "Invalid chirp id")
+		return
+	}
+
+	chirp, err := cfg.db.GetChirp(r.Context(), id)
+	if err != nil {
+		if strings.Contains(err.Error(), "no rows in result set") {
+			respondWithError(w, 404, "No valid chirp")
+			return
+		}
+
+		log.Printf("Error geting chirp in DB: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	respondWithJSON(w, 200, mapDbChirp(chirp))
+}
+
