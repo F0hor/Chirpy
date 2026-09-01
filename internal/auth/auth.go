@@ -6,6 +6,8 @@ import(
 	"errors"
 	"strings"
 	"net/http"
+	"crypto/rand"
+	"encoding/hex"
 
 	"github.com/google/uuid"
 	
@@ -82,5 +84,11 @@ func GetBearerToken(headers http.Header) (string, error) {
 	}
 
 	return strings.Split(bearer, " ")[1], nil
+}
+
+func MakeRefreshToken() string {
+	key := make([]byte, 32)
+	rand.Read(key)
+	return hex.EncodeToString(key)
 }
 

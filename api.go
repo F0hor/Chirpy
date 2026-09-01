@@ -167,7 +167,65 @@ func (cfg *apiConfig) handlerLoginUser(w http.ResponseWriter, r *http.Request) {
 	}
 	ret.Token = token
 
+	refresh, err := cfg.db.CreateRefreshToken(
+		r.Context(),
+		database.CreateRefreshTokenParams{
+			Token: auth.MakeRefreshToken(),
+			UserID: ret.ID,
+		},
+	)
+	if err != nil {
+		respondWithError(w, 500, "Failed to make validation token")
+	}
+	ret.Refresh = refresh.Token
+
 	respondWithJSON(w, 200, ret)
+}
+
+func (cfg *apiConfig) handlerRefreshUser(w http.ResponseWriter, r *http.Request) {
+	bToken, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, 401, "Missing or invalid refresh token")
+		return
+	}
+
+	refresh, err := cfg.db.GetRefreshToken(r.Context(), bToken)
+	if err != nil {
+		respondWithError(w, 401, "Missing or invalid refresh token")
+		return
+	}
+
+	if refresh.RevokedAt.Valid || time.Now().After(refresh.ExpiresAt) {
+		respondWithError(w, 401, "Missing or invalid refresh token")
+		return
+	}
+
+	expiresIn, err := time.ParseDuration("1h")
+	token, err := auth.MakeJWT(refresh.UserID, cfg.secret, expiresIn)
+	if err != nil {
+		respondWithError(w, 500, "Failed to make validation token")
+	}
+
+	type ref struct {
+		Token string `json:"token"`
+	}
+	respondWithJSON(w, 200, ref{Token: token})
+}
+
+func (cfg *apiConfig) handlerRevokeUser(w http.ResponseWriter, r *http.Request) {
+	bToken, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, 401, "Missing or invalid refresh token")
+		return
+	}
+
+	err = cfg.db.RevokeRefresh(r.Context(), bToken)
+	if err != nil {
+		respondWithError(w, 401, "Missing or invalid refresh token")
+		return
+	}
+
+	w.WriteHeader(204)
 }
 
 func (cfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request) {
