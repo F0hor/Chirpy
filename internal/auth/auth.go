@@ -4,6 +4,8 @@ import(
 	"log"
 	"time"
 	"errors"
+	"strings"
+	"net/http"
 
 	"github.com/google/uuid"
 	
@@ -71,5 +73,14 @@ func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
 	}
 
 	return userID, nil
+}
+
+func GetBearerToken(headers http.Header) (string, error) {
+	bearer := headers.Get("Authorization")
+	if bearer == "" {
+		return "", errors.New("Missing Authorization")
+	}
+
+	return strings.Split(bearer, " ")[1], nil
 }
 

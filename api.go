@@ -6,6 +6,8 @@ import(
 	"log"
 	"strings"
 	"slices"
+	"time"
+	"fmt"
 
 	"github.com/google/uuid"
 
@@ -22,7 +24,6 @@ var profaneWords = []string{
 func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Body string `json:"body"`
-		UserID string `json:"user_id"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -34,13 +35,25 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, 401, "Missing validation token")
+		return
+	}
+
+	tokenID, err := auth.ValidateJWT(token, cfg.secret)
+	if err != nil {
+		log.Printf("Validation error: %s", err)
+		respondWithError(w, 401, "Broken or invalit validation token")
+		return
+	}
+
 	if len(params.Body) > 140 {
 		respondWithError(w, 400, "Chirp is too long")
 		return
 	}
 
 	cenStr := censoreProfane(params.Body)
-	uid, err := uuid.Parse(params.UserID)
 	if err != nil {
 		log.Printf("Error while creating chirp: %s", err)
 		respondWithError(w, 400, "Invalid user id")
@@ -51,7 +64,7 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 		r.Context(),
 		database.CreateChirpParams{
 			Body: cenStr,
-			UserID: uid,
+			UserID: tokenID,
 		},
 	)
 	if err != nil {
@@ -117,6 +130,7 @@ func (cfg *apiConfig) handlerLoginUser(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Email string `json:"email"`
 		Pass string `json:"password"`
+		ExpiresIn int `json:"expires_in_seconds"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -141,7 +155,19 @@ func (cfg *apiConfig) handlerLoginUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondWithJSON(w, 200, mapDbUser(user))
+	ret := mapDbUser(user)
+	expiresIn, err := time.ParseDuration("1h")
+	if params.ExpiresIn > 0 && params.ExpiresIn < 3600 {
+		expiresIn, err = time.ParseDuration(fmt.Sprintf("%vs", params.ExpiresIn))
+	}
+
+	token, err := auth.MakeJWT(ret.ID, cfg.secret, expiresIn)
+	if err != nil {
+		respondWithError(w, 500, "Failed to make validation token")
+	}
+	ret.Token = token
+
+	respondWithJSON(w, 200, ret)
 }
 
 func (cfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request) {
