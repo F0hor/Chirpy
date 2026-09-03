@@ -2,25 +2,14 @@ package main
 
 import(
 	"net/http"
-	"encoding/json"
 	"log"
-	"strings"
-	"slices"
 	"time"
 	"fmt"
 
-	"github.com/google/uuid"
-
 	"github.com/F0hor/Chirpy/internal/database"
 	"github.com/F0hor/Chirpy/internal/auth"
-	"github.com/F0hor/Chirpy/internal/jsonHand"
+	"github.com/F0hor/Chirpy/internal/jsonhand"
 )
-
-var profaneWords = []string{
-	"kerfuffle",
-	"sharbert",
-	"fornax",
-}
 
 func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
@@ -29,7 +18,7 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) 
 	}
 
 	params := parameters{}
-	err := decode(w, r, &params)
+	err := jsonhand.Decode(w, r, &params)
 	if err != nil {
 		return
 	}
@@ -54,7 +43,7 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	jsonHand.respondWithJSON(w, 201, mapDbUser(user))
+	jsonhand.RespondWithJSON(w, 201, mapDbUser(user))
 }
 
 func (cfg *apiConfig) handlerUpdateUser(w http.ResponseWriter, r *http.Request) {
@@ -64,12 +53,12 @@ func (cfg *apiConfig) handlerUpdateUser(w http.ResponseWriter, r *http.Request) 
 	}
 
 	params := parameters{}
-	err := decode(w, r, &params)
+	err := jsonhand.Decode(w, r, &params)
 	if err != nil {
 		return
 	}
 
-	tokenId, err := GetUserIDFromHeader(w, r.Header, cfg.secret)
+	tokenId, err := auth.GetUserIDFromHeader(w, r.Header, cfg.secret)
 	if err != nil {
 		return
 	}
@@ -95,7 +84,7 @@ func (cfg *apiConfig) handlerUpdateUser(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	jsonHand.respondWithJSON(w, 200, mapDbUser(user))	
+	jsonhand.RespondWithJSON(w, 200, mapDbUser(user))	
 }
 
 func (cfg *apiConfig) handlerLoginUser(w http.ResponseWriter, r *http.Request) {
@@ -106,7 +95,7 @@ func (cfg *apiConfig) handlerLoginUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	params := parameters{}
-	err := decode(w, r, &params)
+	err := jsonhand.Decode(w, r, &params)
 	if err != nil {
 		return
 	}
@@ -114,13 +103,13 @@ func (cfg *apiConfig) handlerLoginUser(w http.ResponseWriter, r *http.Request) {
 	user, err := cfg.db.GetUserByMail(r.Context(), params.Email)
 	if err != nil {
 		log.Printf("Error getting user in DB: %s", err)
-		jsonHand.respondWithError(w, 401, "Incorrect email or password")
+		jsonhand.RespondWithError(w, 401, "Incorrect email or password")
 		return
 	}
 
 	match, err := auth.CheckPasswordHash(params.Pass, user.HashedPassword)
 	if err != nil || !match {
-		jsonHand.respondWithError(w, 401, "Incorrect email or password")
+		jsonhand.RespondWithError(w, 401, "Incorrect email or password")
 		return
 	}
 
@@ -132,7 +121,7 @@ func (cfg *apiConfig) handlerLoginUser(w http.ResponseWriter, r *http.Request) {
 
 	token, err := auth.MakeJWT(ret.ID, cfg.secret, expiresIn)
 	if err != nil {
-		jsonHand.respondWithError(w, 500, "Failed to make validation token")
+		jsonhand.RespondWithError(w, 500, "Failed to make validation token")
 	}
 	ret.Token = token
 
@@ -144,54 +133,54 @@ func (cfg *apiConfig) handlerLoginUser(w http.ResponseWriter, r *http.Request) {
 		},
 	)
 	if err != nil {
-		jsonHand.respondWithError(w, 500, "Failed to make validation token")
+		jsonhand.RespondWithError(w, 500, "Failed to make validation token")
 	}
 	ret.Refresh = refresh.Token
 
-	jsonHand.respondWithJSON(w, 200, ret)
+	jsonhand.RespondWithJSON(w, 200, ret)
 }
 
 func (cfg *apiConfig) handlerRefreshUser(w http.ResponseWriter, r *http.Request) {
 	bToken, err := auth.GetBearerToken(r.Header)
 	if err != nil {
-		jsonHand.respondWithError(w, 401, "Missing or invalid refresh token")
+		jsonhand.RespondWithError(w, 401, "Missing or invalid refresh token")
 		return
 	}
 
 	refresh, err := cfg.db.GetRefreshToken(r.Context(), bToken)
 	if err != nil {
-		jsonHand.respondWithError(w, 401, "Missing or invalid refresh token")
+		jsonhand.RespondWithError(w, 401, "Missing or invalid refresh token")
 		return
 	}
 
 	if refresh.RevokedAt.Valid || time.Now().After(refresh.ExpiresAt) {
-		jsonHand.respondWithError(w, 401, "Missing or invalid refresh token")
+		jsonhand.RespondWithError(w, 401, "Missing or invalid refresh token")
 		return
 	}
 
 	expiresIn, err := time.ParseDuration("1h")
 	token, err := auth.MakeJWT(refresh.UserID, cfg.secret, expiresIn)
 	if err != nil {
-		jsonHand.respondWithError(w, 500, "Failed to make validation token")
+		jsonhand.RespondWithError(w, 500, "Failed to make validation token")
 		return
 	}
 
 	type ref struct {
 		Token string `json:"token"`
 	}
-	jsonHand.respondWithJSON(w, 200, ref{Token: token})
+	jsonhand.RespondWithJSON(w, 200, ref{Token: token})
 }
 
 func (cfg *apiConfig) handlerRevokeUser(w http.ResponseWriter, r *http.Request) {
 	bToken, err := auth.GetBearerToken(r.Header)
 	if err != nil {
-		jsonHand.respondWithError(w, 401, "Missing or invalid refresh token")
+		jsonhand.RespondWithError(w, 401, "Missing or invalid refresh token")
 		return
 	}
 
 	err = cfg.db.RevokeRefresh(r.Context(), bToken)
 	if err != nil {
-		jsonHand.respondWithError(w, 401, "Missing or invalid refresh token")
+		jsonhand.RespondWithError(w, 401, "Missing or invalid refresh token")
 		return
 	}
 

@@ -2,18 +2,15 @@ package main
 
 import(
 	"net/http"
-	"encoding/json"
 	"log"
 	"strings"
 	"slices"
-	"time"
-	"fmt"
 
 	"github.com/google/uuid"
 
 	"github.com/F0hor/Chirpy/internal/database"
 	"github.com/F0hor/Chirpy/internal/auth"
-	"github.com/F0hor/Chirpy/internal/jsonHand"
+	"github.com/F0hor/Chirpy/internal/jsonhand"
 )
 
 var profaneWords = []string{
@@ -28,25 +25,25 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 	}
 
 	params := parameters{}
-	err := decode(w, r, &params)
+	err := jsonhand.Decode(w, r, params)
 	if err != nil {
 		return
 	}
 
-	tokenId, err := GetUserIDFromHeader(w, r.Header, cfg.secret)
+	tokenID, err := auth.GetUserIDFromHeader(w, r.Header, cfg.secret)
 	if err != nil {
 		return
 	}
 
 	if len(params.Body) > 140 {
-		jsonHand.respondWithError(w, 400, "Chirp is too long")
+		jsonhand.RespondWithError(w, 400, "Chirp is too long")
 		return
 	}
 
 	cenStr := censoreProfane(params.Body)
 	if err != nil {
 		log.Printf("Error while creating chirp: %s", err)
-		jsonHand.respondWithError(w, 400, "Invalid user id")
+		jsonhand.RespondWithError(w, 400, "Invalid user id")
 		return
 	}
 
@@ -63,7 +60,7 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	jsonHand.respondWithJSON(w, 201, mapDbChirp(chirp))
+	jsonhand.RespondWithJSON(w, 201, mapDbChirp(chirp))
 }
 
 func censoreProfane(txt string) string {
@@ -91,20 +88,20 @@ func (cfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request) {
 		ret = append(ret, mapDbChirp(c))
 	}
 
-	jsonHand.respondWithJSON(w, 200, ret)
+	jsonhand.RespondWithJSON(w, 200, ret)
 }
 
 func (cfg *apiConfig) handlerGetChirp(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("chirpID"))
 	if err != nil {
-		respondWithError(w, 400, "Invalid chirp id")
+		jsonhand.RespondWithError(w, 400, "Invalid chirp id")
 		return
 	}
 
 	chirp, err := cfg.db.GetChirp(r.Context(), id)
 	if err != nil {
 		if strings.Contains(err.Error(), "no rows in result set") {
-			jsonHand.respondWithError(w, 404, "No valid chirp")
+			jsonhand.RespondWithError(w, 404, "No valid chirp")
 			return
 		}
 
@@ -113,6 +110,6 @@ func (cfg *apiConfig) handlerGetChirp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonHand.respondWithJSON(w, 200, mapDbChirp(chirp))
+	jsonhand.RespondWithJSON(w, 200, mapDbChirp(chirp))
 }
 

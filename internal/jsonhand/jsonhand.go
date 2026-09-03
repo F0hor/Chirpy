@@ -1,4 +1,4 @@
-package jsonHand
+package jsonhand
 
 import(
 	"net/http"
@@ -6,7 +6,7 @@ import(
 	"log"
 )
 
-func respondWithError(w http.ResponseWriter, code int, msg string) {
+func RespondWithError(w http.ResponseWriter, code int, msg string) {
 	type returnError struct {
 		ErrorMsg string `json:"error"`
 	}
@@ -27,7 +27,7 @@ func respondWithError(w http.ResponseWriter, code int, msg string) {
   w.Write(dat)
 }
 
-func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
+func RespondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 	dat, err := json.Marshal(payload)
 	if err != nil {
 			log.Printf("Error marshalling JSON: %s", err)
@@ -40,12 +40,12 @@ func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
   w.Write(dat)
 }
 
-func decode(w http.ResponseWriter, r *http.Request, params *any) error {
+func Decode(w http.ResponseWriter, r *http.Request, params any) error {
 	decoder := json.NewDecoder(r.Body)
 	err := decoder.Decode(&params)
 	if err != nil {
 		log.Printf("Error decoding parameters: %s", err)
-		respondWithError(w, 500, "Failed to decode request body")
+		RespondWithError(w, 500, "Failed to decode request body")
 		return err
 	}
 	return nil

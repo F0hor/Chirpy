@@ -13,7 +13,7 @@ import(
 	"github.com/alexedwards/argon2id"
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/F0hor/Chirpy/internal/jsonHand"
+	"github.com/F0hor/Chirpy/internal/jsonhand"
 )
 
 func HashPassword(password string) (string, error) {
@@ -96,14 +96,14 @@ func MakeRefreshToken() string {
 func GetUserIDFromHeader(w http.ResponseWriter, headers http.Header, tokenSecret string) (uuid.UUID, error) {
 	token, err := GetBearerToken(headers)
 	if err != nil {
-		jsonHand.respondWithError(w, 401, "Missing validation token")
+		jsonhand.RespondWithError(w, 401, "Missing validation token")
 		return uuid.New(), err
 	}
 
 	tokenID, err := ValidateJWT(token, tokenSecret)
 	if err != nil {
 		log.Printf("Validation error: %s", err)
-		jsonHand.respondWithError(w, 401, "Broken or invalit validation token")
+		jsonhand.RespondWithError(w, 401, "Broken or invalit validation token")
 		return uuid.New(), err
 	}
 
