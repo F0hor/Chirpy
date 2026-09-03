@@ -1,4 +1,4 @@
-package main
+package jsonHand
 
 import(
 	"net/http"
@@ -40,3 +40,13 @@ func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
   w.Write(dat)
 }
 
+func decode(w http.ResponseWriter, r *http.Request, params *any) error {
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&params)
+	if err != nil {
+		log.Printf("Error decoding parameters: %s", err)
+		respondWithError(w, 500, "Failed to decode request body")
+		return err
+	}
+	return nil
+}

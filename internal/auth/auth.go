@@ -10,9 +10,10 @@ import(
 	"encoding/hex"
 
 	"github.com/google/uuid"
-	
 	"github.com/alexedwards/argon2id"
 	"github.com/golang-jwt/jwt/v5"
+
+	"github.com/F0hor/Chirpy/internal/jsonHand"
 )
 
 func HashPassword(password string) (string, error) {
@@ -90,5 +91,22 @@ func MakeRefreshToken() string {
 	key := make([]byte, 32)
 	rand.Read(key)
 	return hex.EncodeToString(key)
+}
+
+func GetUserIDFromHeader(w http.ResponseWriter, headers http.Header, tokenSecret string) (uuid.UUID, error) {
+	token, err := GetBearerToken(headers)
+	if err != nil {
+		jsonHand.respondWithError(w, 401, "Missing validation token")
+		return uuid.New(), err
+	}
+
+	tokenID, err := ValidateJWT(token, tokenSecret)
+	if err != nil {
+		log.Printf("Validation error: %s", err)
+		jsonHand.respondWithError(w, 401, "Broken or invalit validation token")
+		return uuid.New(), err
+	}
+
+	return tokenID, err
 }
 
