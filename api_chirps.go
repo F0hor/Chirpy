@@ -63,6 +63,39 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 	jsonhand.RespondWithJSON(w, 201, mapDbChirp(chirp))
 }
 
+func (cfg *apiConfig) handlerDeleteChirp(w http.ResponseWriter, r *http.Request) {
+	userID, err := auth.GetUserIDFromHeader(w, r.Header, cfg.secret)
+	if err != nil {
+		return
+	}
+
+	chirpID, err := uuid.Parse(r.PathValue("chirpID"))
+	if err != nil {
+		jsonhand.RespondWithError(w, 400, "Invalid chirp id")
+		return
+	}
+
+	chirp, err := cfg.db.GetChirp(r.Context(), chirpID)
+	if err != nil {
+		jsonhand.RespondWithError(w, 404, "Chirp not found")
+		return
+	}
+
+	if userID != chirp.UserID {
+		jsonhand.RespondWithError(w, 403, "Chirp belongs to another user")
+		return
+	}
+
+	err = cfg.db.DeleteChirp(r.Context(), chirpID)
+	if err != nil {
+		log.Printf("Failed to delete chirp: %s", err)
+		jsonhand.RespondWithError(w, 500, "Failed to delete chirp")
+		return
+	}
+
+	w.WriteHeader(204)
+}
+
 func censoreProfane(txt string) string {
 	words := strings.Split(txt, " ")
 
