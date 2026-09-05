@@ -6,6 +6,7 @@ import(
 	"github.com/google/uuid"
 
 	"github.com/F0hor/Chirpy/internal/jsonhand"
+	"github.com/F0hor/Chirpy/internal/auth"
 )
 
 func (cfg *apiConfig) handlerPolkaWebhook(w http.ResponseWriter, r *http.Request) {
@@ -33,6 +34,12 @@ func (cfg *apiConfig) handlerPolkaWebhook(w http.ResponseWriter, r *http.Request
 }
 
 func (cfg *apiConfig) PolkaUpgradeUser(w http.ResponseWriter, r *http.Request, userIDstr string) {
+	key, err := auth.GetAPIKey(r.Header)
+	if err != nil || key != cfg.polkaKey {
+		jsonhand.RespondWithError(w, 401, "Missing or invalid API key")
+		return
+	}
+
 	userID, err := uuid.Parse(userIDstr)
 	if err != nil {
 		jsonhand.RespondWithError(w, 404, "Failed to parse user ID")

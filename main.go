@@ -19,6 +19,7 @@ type apiConfig struct {
 	db *database.Queries
 	isDev bool
 	secret string
+	polkaKey string
 }
 
 func main() {
@@ -45,6 +46,7 @@ func main() {
 		db: dbQueries,
 		isDev: isDev,
 		secret: os.Getenv("SECRET"),
+		polkaKey: os.Getenv("POLKA_KEY"),
 	}
 
 	mux := http.NewServeMux()

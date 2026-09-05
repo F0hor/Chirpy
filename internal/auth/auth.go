@@ -79,12 +79,20 @@ func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
 }
 
 func GetBearerToken(headers http.Header) (string, error) {
+	return GetAuthHeader(headers, 1)
+}
+
+func GetAPIKey(headers http.Header) (string, error) {
+	return GetAuthHeader(headers, 1)
+}
+
+func GetAuthHeader(headers http.Header, elem int) (string, error) {
 	bearer := headers.Get("Authorization")
 	if bearer == "" {
 		return "", errors.New("Missing Authorization")
 	}
 
-	return strings.Split(bearer, " ")[1], nil
+	return strings.Split(bearer, " ")[elem], nil
 }
 
 func MakeRefreshToken() string {
