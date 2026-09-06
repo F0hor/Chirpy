@@ -25,13 +25,17 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 	}
 
 	params := parameters{}
-	err := jsonhand.Decode(w, r, params)
+	err := jsonhand.Decode(w, r, &params)
 	if err != nil {
+		log.Printf("Error decoding parameters: %s", err)
+		jsonhand.RespondWithError(w, 400, "Failed to decode request body")	
 		return
 	}
 
 	tokenID, err := auth.GetUserIDFromHeader(w, r.Header, cfg.secret)
 	if err != nil {
+		log.Printf("Error while creating chirp: %s", err)
+		jsonhand.RespondWithError(w, 400, "Invalid user id")
 		return
 	}
 
@@ -40,12 +44,7 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	cenStr := censoreProfane(params.Body)
-	if err != nil {
-		log.Printf("Error while creating chirp: %s", err)
-		jsonhand.RespondWithError(w, 400, "Invalid user id")
-		return
-	}
+	cenStr := censoreProfane(params.Body)	
 
 	chirp, err := cfg.db.CreateChirp(
 		r.Context(),
@@ -109,13 +108,31 @@ func censoreProfane(txt string) string {
 }
 
 func (cfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request) {
-	chirps, err := cfg.db.GetChirps(r.Context())
-	if err != nil {
-		log.Printf("Error geting chirps in DB: %s", err)
-		w.WriteHeader(500)
-		return
-	}
+	authorID := r.URL.Query().Get("author_id")
+	var chirps []database.Chirp
+	var err error
 
+	if authorID == "" {
+		chirps, err = cfg.db.GetChirps(r.Context())
+		if err != nil {
+			log.Printf("Error geting chirps in DB: %s", err)
+			w.WriteHeader(500)
+			return
+		}
+	} else {
+		authorUUID, err := uuid.Parse(authorID)
+		if err != nil {
+			jsonhand.RespondWithError(w, 400, "Invalid author ID")
+			return
+		}
+		chirps, err = cfg.db.GetChirpsByUser(r.Context(), authorUUID)
+		if err != nil {
+			log.Printf("Error geting chirps in DB: %s", err)
+			w.WriteHeader(500)
+			return
+		}
+	}
+	
 	ret := []Chirp{}
 	for _, c := range chirps {
 		ret = append(ret, mapDbChirp(c))
