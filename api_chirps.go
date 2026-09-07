@@ -138,6 +138,16 @@ func (cfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request) {
 		ret = append(ret, mapDbChirp(c))
 	}
 
+	ordering := r.URL.Query().Get("sort")
+	if ordering == "desc" {
+		slices.SortFunc(
+			ret,
+			func(a, b Chirp) int {
+				return b.CreatedAt.Compare(a.CreatedAt)
+			},
+		)
+	}
+
 	jsonhand.RespondWithJSON(w, 200, ret)
 }
 
